@@ -19,7 +19,7 @@
 			]
 		}
 	],
-	"Category": "CPU Usage Partyparrot",
+	"Category": "CPU Partyparrot",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
 	"Description": "Displays partyparrot watching your cpu usage",
