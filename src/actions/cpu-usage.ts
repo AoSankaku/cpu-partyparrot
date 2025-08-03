@@ -35,8 +35,9 @@ export class CpuUsage extends SingletonAction<any> {
         let currentSetIndex = this.currentAnimationSet.get(context) || 0;
         currentSetIndex = (currentSetIndex + 1) % this.animationSets.length;
         this.currentAnimationSet.set(context, currentSetIndex);
-        this.currentFrame.set(context, 0); // Reset frame when changing animation set
-        this.startMonitoring(ev.action, ev.action.id); // Restart monitoring to apply new animation set
+        const frameIndex = this.currentFrame.get(context) || 0; // Get current frame, or default to 0
+        const newAnimationPaths = this.animationSets[currentSetIndex];
+        ev.action.setImage(newAnimationPaths[frameIndex]); // Immediately update the image
     }
 
     private startMonitoring(action: any, context: string): void {
@@ -44,7 +45,7 @@ export class CpuUsage extends SingletonAction<any> {
         this.cpuHistory.set(context, this.getCpuInfo());
         this.currentFrame.set(context, 0);
         this.lastCpuUpdateTime.set(context, Date.now());
-        this.currentCpuPercentage.set(context, 0); // Initialize
+        this.currentCpuPercentage.set(context, this.currentCpuPercentage.get(context) || 0); // Initialize with existing value or 0
         this.currentAnimationSet.set(context, this.currentAnimationSet.get(context) || 0); // Ensure current animation set is initialized
 
         // Start CPU monitoring loop
