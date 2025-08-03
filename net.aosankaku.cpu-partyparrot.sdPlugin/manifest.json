@@ -4,7 +4,7 @@
 	"Author": "AoSankaku",
 	"Actions": [
 		{
-			"Name": "CPU Usage",
+			"Name": "CPU Usage Partyparrot",
 			"UUID": "net.aosankaku.cpu-partyparrot.cpu-usage",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays the current CPU usage.",
@@ -19,7 +19,7 @@
 			]
 		}
 	],
-	"Category": "CPU Partyparrot",
+	"Category": "CPU Usage Partyparrot",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
 	"Description": "Displays partyparrot watching your cpu usage",
