@@ -59,7 +59,7 @@ export class CpuUsage extends SingletonAction<any> {
 
                 if (totalDifference > 0) {
                     const percentage = Math.max(0, (1 - idleDifference / totalDifference) * 100);
-                    action.setTitle(`${percentage.toFixed(1)}%`);
+                    action.setTitle(`CPU ${percentage.toFixed(0)}%`);
                     this.currentCpuPercentage.set(context, percentage); // Store for animation
                 }
             }
