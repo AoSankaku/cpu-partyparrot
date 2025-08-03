@@ -1,6 +1,9 @@
 name: Publish Stream Deck Plugin
 
-on: [push]
+on:
+  push:
+    tags:
+      - 'v*' # Only run on tags like v1.0.0
 
 jobs:
   build:
@@ -28,8 +31,10 @@ jobs:
     - name: Pack Stream Deck Plugin
       run: streamdeck pack net.aosankaku.cpu-partyparrot.sdPlugin
 
-    - name: Upload plugin artifact
-      uses: actions/upload-artifact@v4
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: streamdeck-plugin
-        path: net.aosankaku.cpu-partyparrot.streamDeckPlugin
+        files: net.aosankaku.cpu-partyparrot.streamDeckPlugin
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
