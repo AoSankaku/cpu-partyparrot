@@ -5,10 +5,9 @@
 	"Actions": [
 		{
 			"Name": "CPU Usage",
-			"UUID": "com.aosankaku.cpu-partyparrot.cpu-usage",
+			"UUID": "net.aosankaku.cpu-partyparrot.cpu-usage",
 			"Icon": "imgs/actions/counter/icon",
 			"Tooltip": "Displays the current CPU usage.",
-			
 			"Controllers": [
 				"Keypad"
 			],
@@ -43,5 +42,5 @@
 		"Version": "20",
 		"Debug": "enabled"
 	},
-	"UUID": "com.aosankaku.cpu-partyparrot"
+	"UUID": "net.aosankaku.cpu-partyparrot"
 }

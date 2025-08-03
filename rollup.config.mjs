@@ -6,7 +6,7 @@ import path from "node:path";
 import url from "node:url";
 
 const isWatching = !!process.env.ROLLUP_WATCH;
-const sdPlugin = "com.aosankaku.cpu-partyparrot.sdPlugin";
+const sdPlugin = "net.aosankaku.cpu-partyparrot.sdPlugin";
 
 /**
  * @type {import('rollup').RollupOptions}

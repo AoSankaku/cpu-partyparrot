@@ -1,7 +1,7 @@
 import { action, SingletonAction, WillAppearEvent, WillDisappearEvent, KeyDownEvent } from "@elgato/streamdeck";
 import * as os from "os";
 
-@action({ UUID: "com.aosankaku.cpu-partyparrot.cpu-usage" })
+@action({ UUID: "net.aosankaku.cpu-partyparrot.cpu-usage" })
 export class CpuUsage extends SingletonAction<any> {
     private timers: Map<string, NodeJS.Timeout> = new Map();
     private cpuHistory: Map<string, { idle: number, total: number }> = new Map();
