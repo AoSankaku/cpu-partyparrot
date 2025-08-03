@@ -12,6 +12,7 @@ export class CpuUsage extends SingletonAction<any> {
     ];
 
     private lastCpuUpdateTime: Map<string, number> = new Map();
+    private currentCpuPercentage: Map<string, number> = new Map();
 
     override onWillAppear(ev: WillAppearEvent<any>): void {
         this.startMonitoring(ev.action, ev.action.id);
@@ -26,45 +27,56 @@ export class CpuUsage extends SingletonAction<any> {
         this.cpuHistory.set(context, this.getCpuInfo());
         this.currentFrame.set(context, 0);
         this.lastCpuUpdateTime.set(context, Date.now());
+        this.currentCpuPercentage.set(context, 0); // Initialize
 
-        const update = () => {
-            const now = Date.now();
-            const lastUpdate = this.lastCpuUpdateTime.get(context)!;
+        // Start CPU monitoring loop
+        const cpuUpdateLoop = () => {
+            const start = this.cpuHistory.get(context);
+            const end = this.getCpuInfo();
 
-            // Update CPU usage every second
-            if (now - lastUpdate >= 1000) {
-                const start = this.cpuHistory.get(context);
-                const end = this.getCpuInfo();
+            if (start) {
+                const idleDifference = end.idle - start.idle;
+                const totalDifference = end.total - start.total;
 
-                if (start) {
-                    const idleDifference = end.idle - start.idle;
-                    const totalDifference = end.total - start.total;
-
-                    if (totalDifference > 0) {
-                        const percentage = Math.max(0, (1 - idleDifference / totalDifference) * 100);
-                        action.setTitle(`${percentage.toFixed(1)}%`);
-                    }
+                if (totalDifference > 0) {
+                    const percentage = Math.max(0, (1 - idleDifference / totalDifference) * 100);
+                    action.setTitle(`${percentage.toFixed(1)}%`);
+                    this.currentCpuPercentage.set(context, percentage); // Store for animation
                 }
-                this.cpuHistory.set(context, end);
-                this.lastCpuUpdateTime.set(context, now);
             }
+            this.cpuHistory.set(context, end);
+            this.lastCpuUpdateTime.set(context, Date.now());
+            this.timers.set(context + '_cpu', setTimeout(cpuUpdateLoop, 1000)); // Timer for CPU updates
+        };
 
-            // Update image frame (every 100ms)
+        // Start animation loop
+        const animationLoop = () => {
             let frameIndex = this.currentFrame.get(context)!;
             action.setImage(this.framePaths[frameIndex]);
             frameIndex = (frameIndex + 1) % this.framePaths.length;
             this.currentFrame.set(context, frameIndex);
 
-            this.timers.set(context, setTimeout(update, 100));
+            const percentage = this.currentCpuPercentage.get(context)!;
+            const minDelay = 20; // ms
+            const maxDelay = 220; // ms
+            let animationDelay = maxDelay - (percentage / 100) * (maxDelay - minDelay);
+            animationDelay = Math.max(minDelay, Math.min(maxDelay, animationDelay)); // Clamp values
+
+            this.timers.set(context + '_animation', setTimeout(animationLoop, animationDelay)); // Timer for animation
         };
 
-        update();
+        cpuUpdateLoop(); // Initial call
+        animationLoop(); // Initial call
     }
 
     private stopMonitoring(context: string): void {
-        if (this.timers.has(context)) {
-            clearTimeout(this.timers.get(context)!);
-            this.timers.delete(context);
+        if (this.timers.has(context + '_cpu')) {
+            clearTimeout(this.timers.get(context + '_cpu')!);
+            this.timers.delete(context + '_cpu');
+        }
+        if (this.timers.has(context + '_animation')) {
+            clearTimeout(this.timers.get(context + '_animation')!);
+            this.timers.delete(context + '_animation');
         }
         if (this.cpuHistory.has(context)) {
             this.cpuHistory.delete(context);
@@ -74,6 +86,9 @@ export class CpuUsage extends SingletonAction<any> {
         }
         if (this.lastCpuUpdateTime.has(context)) {
             this.lastCpuUpdateTime.delete(context);
+        }
+        if (this.currentCpuPercentage.has(context)) {
+            this.currentCpuPercentage.delete(context);
         }
     }
 
