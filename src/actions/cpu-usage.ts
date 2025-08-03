@@ -29,6 +29,7 @@ export class CpuUsage extends SingletonAction<any> {
                 if (totalDifference > 0) {
                     const percentage = Math.max(0, (1 - idleDifference / totalDifference) * 100);
                     action.setTitle(`${percentage.toFixed(1)}%`);
+                    
                 }
             }
 
