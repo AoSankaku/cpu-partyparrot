@@ -1,4 +1,4 @@
-import { action, SingletonAction, WillAppearEvent, WillDisappearEvent } from "@elgato/streamdeck";
+import { action, SingletonAction, WillAppearEvent, WillDisappearEvent, KeyDownEvent } from "@elgato/streamdeck";
 import * as os from "os";
 
 @action({ UUID: "com.aosankaku.cpu-partyparrot.cpu-usage" })
@@ -6,13 +6,20 @@ export class CpuUsage extends SingletonAction<any> {
     private timers: Map<string, NodeJS.Timeout> = new Map();
     private cpuHistory: Map<string, { idle: number, total: number }> = new Map();
     private currentFrame: Map<string, number> = new Map();
-    private framePaths: string[] = [
-        "imgs/frame_00", "imgs/frame_01", "imgs/frame_02", "imgs/frame_03", "imgs/frame_04",
-        "imgs/frame_05", "imgs/frame_06", "imgs/frame_07", "imgs/frame_08", "imgs/frame_09"
-    ];
-
     private lastCpuUpdateTime: Map<string, number> = new Map();
     private currentCpuPercentage: Map<string, number> = new Map();
+    private currentAnimationSet: Map<string, number> = new Map();
+
+    private animationSets: string[][] = [
+        ["imgs/frame_00", "imgs/frame_01", "imgs/frame_02", "imgs/frame_03", "imgs/frame_04",
+            "imgs/frame_05", "imgs/frame_06", "imgs/frame_07", "imgs/frame_08", "imgs/frame_09"],
+        ["imgs/conga_line_frame_00", "imgs/conga_line_frame_01", "imgs/conga_line_frame_02", "imgs/conga_line_frame_03", "imgs/conga_line_frame_04",
+            "imgs/conga_line_frame_05", "imgs/conga_line_frame_06", "imgs/conga_line_frame_07", "imgs/conga_line_frame_08", "imgs/conga_line_frame_09"],
+        ["imgs/blobcatrainbow_frame_00", "imgs/blobcatrainbow_frame_01", "imgs/blobcatrainbow_frame_02", "imgs/blobcatrainbow_frame_03", "imgs/blobcatrainbow_frame_04",
+            "imgs/blobcatrainbow_frame_05", "imgs/blobcatrainbow_frame_06", "imgs/blobcatrainbow_frame_07", "imgs/blobcatrainbow_frame_08", "imgs/blobcatrainbow_frame_09"],
+        ["imgs/sirocco_frame_00", "imgs/sirocco_frame_01", "imgs/sirocco_frame_02", "imgs/sirocco_frame_03", "imgs/sirocco_frame_04",
+            "imgs/sirocco_frame_05", "imgs/sirocco_frame_06", "imgs/sirocco_frame_07", "imgs/sirocco_frame_08", "imgs/sirocco_frame_09"]
+    ];
 
     override onWillAppear(ev: WillAppearEvent<any>): void {
         this.startMonitoring(ev.action, ev.action.id);
@@ -22,12 +29,23 @@ export class CpuUsage extends SingletonAction<any> {
         this.stopMonitoring(ev.action.id);
     }
 
+    override onKeyDown(ev: KeyDownEvent<any>): void {
+        console.log(`Key Down Event: ${ev.action.id}`);
+        const context = ev.action.id;
+        let currentSetIndex = this.currentAnimationSet.get(context) || 0;
+        currentSetIndex = (currentSetIndex + 1) % this.animationSets.length;
+        this.currentAnimationSet.set(context, currentSetIndex);
+        this.currentFrame.set(context, 0); // Reset frame when changing animation set
+        this.startMonitoring(ev.action, ev.action.id); // Restart monitoring to apply new animation set
+    }
+
     private startMonitoring(action: any, context: string): void {
         this.stopMonitoring(context);
         this.cpuHistory.set(context, this.getCpuInfo());
         this.currentFrame.set(context, 0);
         this.lastCpuUpdateTime.set(context, Date.now());
         this.currentCpuPercentage.set(context, 0); // Initialize
+        this.currentAnimationSet.set(context, this.currentAnimationSet.get(context) || 0); // Ensure current animation set is initialized
 
         // Start CPU monitoring loop
         const cpuUpdateLoop = () => {
@@ -52,12 +70,13 @@ export class CpuUsage extends SingletonAction<any> {
         // Start animation loop
         const animationLoop = () => {
             let frameIndex = this.currentFrame.get(context)!;
-            action.setImage(this.framePaths[frameIndex]);
-            frameIndex = (frameIndex + 1) % this.framePaths.length;
+            const currentFramePaths = this.animationSets[this.currentAnimationSet.get(context)!];
+            action.setImage(currentFramePaths[frameIndex]);
+            frameIndex = (frameIndex + 1) % currentFramePaths.length;
             this.currentFrame.set(context, frameIndex);
 
             const percentage = this.currentCpuPercentage.get(context)!;
-            const minDelay = 20; // ms
+            const minDelay = 0; // ms
             const maxDelay = 220; // ms
             let animationDelay = maxDelay - (percentage / 100) * (maxDelay - minDelay);
             animationDelay = Math.max(minDelay, Math.min(maxDelay, animationDelay)); // Clamp values
