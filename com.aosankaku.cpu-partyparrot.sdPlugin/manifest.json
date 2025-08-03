@@ -4,11 +4,11 @@
 	"Author": "AoSankaku",
 	"Actions": [
 		{
-			"Name": "Counter",
-			"UUID": "com.aosankaku.cpu-partyparrot.increment",
+			"Name": "CPU Usage",
+			"UUID": "com.aosankaku.cpu-partyparrot.cpu-usage",
 			"Icon": "imgs/actions/counter/icon",
-			"Tooltip": "Displays a count, which increments by one on press.",
-			"PropertyInspectorPath": "ui/increment-counter.html",
+			"Tooltip": "Displays the current CPU usage.",
+			
 			"Controllers": [
 				"Keypad"
 			],
