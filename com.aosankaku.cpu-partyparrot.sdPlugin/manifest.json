@@ -14,7 +14,7 @@
 			],
 			"States": [
 				{
-					"Image": "imgs/actions/counter/key",
+					"Image": "imgs/frame_00",
 					"TitleAlignment": "bottom"
 				}
 			]
