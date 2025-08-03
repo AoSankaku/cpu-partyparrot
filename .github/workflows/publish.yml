@@ -1,0 +1,35 @@
+name: Publish Stream Deck Plugin
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
+
+    - name: Build project
+      run: yarn build
+
+    - name: Install Stream Deck CLI
+      run: yarn global add @elgato/cli
+
+    - name: Pack Stream Deck Plugin
+      run: streamdeck pack net.aosankaku.cpu-partyparrot.sdPlugin
+
+    - name: Upload plugin artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: streamdeck-plugin
+        path: net.aosankaku.cpu-partyparrot.streamDeckPlugin
