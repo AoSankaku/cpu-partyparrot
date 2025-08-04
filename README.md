@@ -2,6 +2,12 @@
 
 タイトル通りです。
 
+## 詳細
+
+詳細は以下の記事で紹介しています。
+
+https://aosankaku.net/blog/partyparrot_streamdeck_plugin/
+
 ## 注
 
 このコードはAI生成（Gemini CLI）のコードを含んでいます。
