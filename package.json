@@ -1,6 +1,8 @@
 {
     "scripts": {
         "build": "rollup -c",
+        "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/monitoring.test.js",
+        "typecheck": "tsc --noEmit",
         "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart net.aosankaku.cpu-partyparrot\""
     },
     "type": "module",

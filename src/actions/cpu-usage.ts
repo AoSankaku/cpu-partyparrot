@@ -1,16 +1,38 @@
-import { action, SingletonAction, WillAppearEvent, WillDisappearEvent, KeyDownEvent } from "@elgato/streamdeck";
-import * as os from "os";
+import {
+    action,
+    KeyAction,
+    KeyDownEvent,
+    SingletonAction,
+    WillAppearEvent,
+    WillDisappearEvent
+} from "@elgato/streamdeck";
+import * as os from "node:os";
+
+import {
+    calculateAnimationDelay,
+    calculateCpuPercentage,
+    CPU_UPDATE_INTERVAL_MS,
+    CpuSnapshot
+} from "../monitoring";
+
+interface ContextState {
+    action: KeyAction;
+    animationSetIndex: number;
+    frameIndex: number;
+    lastImage?: string;
+    lastTitle?: string;
+}
 
 @action({ UUID: "net.aosankaku.cpu-partyparrot.cpu-usage" })
-export class CpuUsage extends SingletonAction<any> {
-    private timers: Map<string, NodeJS.Timeout> = new Map();
-    private cpuHistory: Map<string, { idle: number, total: number }> = new Map();
-    private currentFrame: Map<string, number> = new Map();
-    private lastCpuUpdateTime: Map<string, number> = new Map();
-    private currentCpuPercentage: Map<string, number> = new Map();
-    private currentAnimationSet: Map<string, number> = new Map();
+export class CpuUsage extends SingletonAction {
+    private readonly contexts = new Map<string, ContextState>();
+    private cpuTimer?: NodeJS.Timeout;
+    private animationTimer?: NodeJS.Timeout;
+    private cpuHistory?: CpuSnapshot;
+    private currentCpuPercentage = 0;
+    private loopGeneration = 0;
 
-    private animationSets: string[][] = [
+    private readonly animationSets: readonly (readonly string[])[] = [
         ["imgs/frame_00", "imgs/frame_01", "imgs/frame_02", "imgs/frame_03", "imgs/frame_04",
             "imgs/frame_05", "imgs/frame_06", "imgs/frame_07", "imgs/frame_08", "imgs/frame_09"],
         ["imgs/conga_line_frame_00", "imgs/conga_line_frame_01", "imgs/conga_line_frame_02", "imgs/conga_line_frame_03", "imgs/conga_line_frame_04",
@@ -21,109 +43,136 @@ export class CpuUsage extends SingletonAction<any> {
             "imgs/sirocco_frame_05", "imgs/sirocco_frame_06", "imgs/sirocco_frame_07", "imgs/sirocco_frame_08", "imgs/sirocco_frame_09"]
     ];
 
-    override onWillAppear(ev: WillAppearEvent<any>): void {
-        this.startMonitoring(ev.action, ev.action.id);
+    override onWillAppear(ev: WillAppearEvent): void {
+        if (!ev.action.isKey()) {
+            return;
+        }
+
+        const wasEmpty = this.contexts.size === 0;
+        this.contexts.set(ev.action.id, {
+            action: ev.action,
+            animationSetIndex: 0,
+            frameIndex: 0
+        });
+
+        if (wasEmpty) {
+            this.startLoops();
+        }
     }
 
-    override onWillDisappear(ev: WillDisappearEvent<any>): void {
-        this.stopMonitoring(ev.action.id);
+    override onWillDisappear(ev: WillDisappearEvent): void {
+        this.contexts.delete(ev.action.id);
+        if (this.contexts.size === 0) {
+            this.stopLoops();
+        }
     }
 
-    override onKeyDown(ev: KeyDownEvent<any>): void {
-        console.log(`Key Down Event: ${ev.action.id}`);
-        const context = ev.action.id;
-        let currentSetIndex = this.currentAnimationSet.get(context) || 0;
-        currentSetIndex = (currentSetIndex + 1) % this.animationSets.length;
-        this.currentAnimationSet.set(context, currentSetIndex);
-        const frameIndex = this.currentFrame.get(context) || 0; // Get current frame, or default to 0
-        const newAnimationPaths = this.animationSets[currentSetIndex];
-        ev.action.setImage(newAnimationPaths[frameIndex]); // Immediately update the image
+    override onKeyDown(ev: KeyDownEvent): void {
+        const state = this.contexts.get(ev.action.id);
+        if (!state) {
+            return;
+        }
+
+        state.animationSetIndex = (state.animationSetIndex + 1) % this.animationSets.length;
+        state.frameIndex %= this.animationSets[state.animationSetIndex].length;
+        state.lastImage = undefined;
     }
 
-    private startMonitoring(action: any, context: string): void {
-        this.stopMonitoring(context);
-        this.cpuHistory.set(context, this.getCpuInfo());
-        this.currentFrame.set(context, 0);
-        this.lastCpuUpdateTime.set(context, Date.now());
-        this.currentCpuPercentage.set(context, this.currentCpuPercentage.get(context) || 0); // Initialize with existing value or 0
-        this.currentAnimationSet.set(context, this.currentAnimationSet.get(context) || 0); // Ensure current animation set is initialized
+    private startLoops(): void {
+        this.stopLoops();
+        const generation = ++this.loopGeneration;
+        this.cpuHistory = this.getCpuInfo();
+        this.cpuTimer = setTimeout(
+            () => void this.runCpuLoop(generation),
+            CPU_UPDATE_INTERVAL_MS
+        );
+        void this.runAnimationLoop(generation);
+    }
 
-        // Start CPU monitoring loop
-        const cpuUpdateLoop = () => {
-            const start = this.cpuHistory.get(context);
-            const end = this.getCpuInfo();
+    private stopLoops(): void {
+        ++this.loopGeneration;
 
-            if (start) {
-                const idleDifference = end.idle - start.idle;
-                const totalDifference = end.total - start.total;
+        if (this.cpuTimer) {
+            clearTimeout(this.cpuTimer);
+            this.cpuTimer = undefined;
+        }
+        if (this.animationTimer) {
+            clearTimeout(this.animationTimer);
+            this.animationTimer = undefined;
+        }
 
-                if (totalDifference > 0) {
-                    const percentage = Math.max(0, (1 - idleDifference / totalDifference) * 100);
-                    action.setTitle(`CPU ${percentage.toFixed(0)}%`);
-                    this.currentCpuPercentage.set(context, percentage); // Store for animation
-                }
+        this.cpuHistory = undefined;
+        this.currentCpuPercentage = 0;
+    }
+
+    private isLoopActive(generation: number): boolean {
+        return generation === this.loopGeneration && this.contexts.size > 0;
+    }
+
+    private async runCpuLoop(generation: number): Promise<void> {
+        if (!this.isLoopActive(generation)) {
+            return;
+        }
+
+        const end = this.getCpuInfo();
+        if (this.cpuHistory) {
+            this.currentCpuPercentage = calculateCpuPercentage(this.cpuHistory, end);
+        }
+        this.cpuHistory = end;
+
+        const title = `CPU ${Math.round(this.currentCpuPercentage)}%`;
+        const updates: Promise<void>[] = [];
+        for (const state of this.contexts.values()) {
+            if (state.lastTitle !== title) {
+                state.lastTitle = title;
+                updates.push(state.action.setTitle(title));
             }
-            this.cpuHistory.set(context, end);
-            this.lastCpuUpdateTime.set(context, Date.now());
-            this.timers.set(context + '_cpu', setTimeout(cpuUpdateLoop, 1000)); // Timer for CPU updates
-        };
-
-        // Start animation loop
-        const animationLoop = () => {
-            let frameIndex = this.currentFrame.get(context)!;
-            const currentFramePaths = this.animationSets[this.currentAnimationSet.get(context)!];
-            action.setImage(currentFramePaths[frameIndex]);
-            frameIndex = (frameIndex + 1) % currentFramePaths.length;
-            this.currentFrame.set(context, frameIndex);
-
-            const percentage = this.currentCpuPercentage.get(context)!;
-            const minDelay = 0; // ms
-            const maxDelay = 220; // ms
-            let animationDelay = maxDelay - (percentage / 100) * (maxDelay - minDelay);
-            animationDelay = Math.max(minDelay, Math.min(maxDelay, animationDelay)); // Clamp values
-
-            this.timers.set(context + '_animation', setTimeout(animationLoop, animationDelay)); // Timer for animation
-        };
-
-        cpuUpdateLoop(); // Initial call
-        animationLoop(); // Initial call
-    }
-
-    private stopMonitoring(context: string): void {
-        if (this.timers.has(context + '_cpu')) {
-            clearTimeout(this.timers.get(context + '_cpu')!);
-            this.timers.delete(context + '_cpu');
         }
-        if (this.timers.has(context + '_animation')) {
-            clearTimeout(this.timers.get(context + '_animation')!);
-            this.timers.delete(context + '_animation');
-        }
-        if (this.cpuHistory.has(context)) {
-            this.cpuHistory.delete(context);
-        }
-        if (this.currentFrame.has(context)) {
-            this.currentFrame.delete(context);
-        }
-        if (this.lastCpuUpdateTime.has(context)) {
-            this.lastCpuUpdateTime.delete(context);
-        }
-        if (this.currentCpuPercentage.has(context)) {
-            this.currentCpuPercentage.delete(context);
+        await Promise.allSettled(updates);
+
+        if (this.isLoopActive(generation)) {
+            this.cpuTimer = setTimeout(
+                () => void this.runCpuLoop(generation),
+                CPU_UPDATE_INTERVAL_MS
+            );
         }
     }
 
-    private getCpuInfo(): { idle: number, total: number } {
-        const cpus = os.cpus();
-        let totalIdle = 0;
-        let totalTick = 0;
+    private async runAnimationLoop(generation: number): Promise<void> {
+        if (!this.isLoopActive(generation)) {
+            return;
+        }
 
-        for (const cpu of cpus) {
-            for (const type in cpu.times) {
-                totalTick += cpu.times[type as keyof typeof cpu.times];
+        const updates: Promise<void>[] = [];
+        for (const state of this.contexts.values()) {
+            const frames = this.animationSets[state.animationSetIndex];
+            const image = frames[state.frameIndex];
+            state.frameIndex = (state.frameIndex + 1) % frames.length;
+
+            if (state.lastImage !== image) {
+                state.lastImage = image;
+                updates.push(state.action.setImage(image));
             }
-            totalIdle += cpu.times.idle;
+        }
+        await Promise.allSettled(updates);
+
+        if (this.isLoopActive(generation)) {
+            this.animationTimer = setTimeout(
+                () => void this.runAnimationLoop(generation),
+                calculateAnimationDelay(this.currentCpuPercentage)
+            );
+        }
+    }
+
+    private getCpuInfo(): CpuSnapshot {
+        let idle = 0;
+        let total = 0;
+
+        for (const cpu of os.cpus()) {
+            idle += cpu.times.idle;
+            total += Object.values(cpu.times).reduce((sum, ticks) => sum + ticks, 0);
         }
 
-        return { idle: totalIdle / cpus.length, total: totalTick / cpus.length };
+        return { idle, total };
     }
 }
