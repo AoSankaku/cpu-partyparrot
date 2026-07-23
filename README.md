@@ -10,7 +10,7 @@ https://aosankaku.net/blog/partyparrot_streamdeck_plugin/
 
 ## 注
 
-このコードはAI生成（Gemini CLI）のコードを含んでいます。
+このコードはAI生成（Gemini CLI・ChatGPT）のコードを含んでいます。
 
 ## Licenses
 
