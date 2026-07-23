@@ -9,21 +9,29 @@ import {
 import * as os from "node:os";
 
 import {
+    getNextAnimationSetIndex,
+    normalizeAnimationSetIndex
+} from "../character-selection";
+import {
     calculateAnimationDelay,
     calculateCpuPercentage,
     CPU_UPDATE_INTERVAL_MS,
     CpuSnapshot
 } from "../monitoring";
 
+type CpuUsageSettings = {
+    animationSetIndex?: number;
+};
+
 interface ContextState {
-    action: KeyAction;
+    action: KeyAction<CpuUsageSettings>;
     animationSetIndex: number;
     lastImage?: string;
     lastTitle?: string;
 }
 
 @action({ UUID: "net.aosankaku.cpu-partyparrot.cpu-usage" })
-export class CpuUsage extends SingletonAction {
+export class CpuUsage extends SingletonAction<CpuUsageSettings> {
     private readonly contexts = new Map<string, ContextState>();
     private cpuTimer?: NodeJS.Timeout;
     private animationTimer?: NodeJS.Timeout;
@@ -43,7 +51,7 @@ export class CpuUsage extends SingletonAction {
             "imgs/sirocco_frame_05", "imgs/sirocco_frame_06", "imgs/sirocco_frame_07", "imgs/sirocco_frame_08", "imgs/sirocco_frame_09"]
     ];
 
-    override onWillAppear(ev: WillAppearEvent): void {
+    override onWillAppear(ev: WillAppearEvent<CpuUsageSettings>): void {
         if (!ev.action.isKey()) {
             return;
         }
@@ -51,7 +59,10 @@ export class CpuUsage extends SingletonAction {
         const wasEmpty = this.contexts.size === 0;
         this.contexts.set(ev.action.id, {
             action: ev.action,
-            animationSetIndex: 0
+            animationSetIndex: normalizeAnimationSetIndex(
+                ev.payload.settings.animationSetIndex,
+                this.animationSets.length
+            )
         });
 
         if (wasEmpty) {
@@ -66,14 +77,22 @@ export class CpuUsage extends SingletonAction {
         }
     }
 
-    override onKeyDown(ev: KeyDownEvent): void {
+    override async onKeyDown(ev: KeyDownEvent<CpuUsageSettings>): Promise<void> {
         const state = this.contexts.get(ev.action.id);
         if (!state) {
             return;
         }
 
-        state.animationSetIndex = (state.animationSetIndex + 1) % this.animationSets.length;
+        state.animationSetIndex = getNextAnimationSetIndex(
+            state.animationSetIndex,
+            this.animationSets.length
+        );
         state.lastImage = undefined;
+
+        await ev.action.setSettings({
+            ...ev.payload.settings,
+            animationSetIndex: state.animationSetIndex
+        });
     }
 
     private startLoops(): void {

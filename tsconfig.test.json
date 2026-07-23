@@ -9,6 +9,7 @@
         "sourceMap": false
     },
     "include": [
+        "src/character-selection.ts",
         "src/monitoring.ts",
         "tests/**/*.ts"
     ]
