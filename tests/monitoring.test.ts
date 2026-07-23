@@ -5,7 +5,8 @@ import {
     calculateAnimationDelay,
     calculateCpuPercentage,
     MAX_ANIMATION_DELAY_MS,
-    MIN_ANIMATION_DELAY_MS
+    MIN_ANIMATION_DELAY_MS,
+    ORIGINAL_PARTY_PARROT_FRAME_DELAY_MS
 } from "../src/monitoring.js";
 
 test("calculateCpuPercentage calculates and clamps CPU usage", () => {
@@ -19,10 +20,12 @@ test("calculateCpuPercentage handles an invalid or unchanged sample", () => {
     assert.equal(calculateCpuPercentage({ idle: 100, total: 1000 }, { idle: 90, total: 900 }), 0);
 });
 
-test("calculateAnimationDelay keeps a safe non-zero lower bound", () => {
+test("calculateAnimationDelay matches the original GIF speed at 65% CPU", () => {
     assert.equal(calculateAnimationDelay(-10), MAX_ANIMATION_DELAY_MS);
     assert.equal(calculateAnimationDelay(0), MAX_ANIMATION_DELAY_MS);
-    assert.equal(calculateAnimationDelay(50), 325);
+    assert.equal(calculateAnimationDelay(50), 154);
+    assert.equal(calculateAnimationDelay(65), ORIGINAL_PARTY_PARROT_FRAME_DELAY_MS);
+    assert.equal(calculateAnimationDelay(80), 36);
     assert.equal(calculateAnimationDelay(100), MIN_ANIMATION_DELAY_MS);
     assert.equal(calculateAnimationDelay(150), MIN_ANIMATION_DELAY_MS);
 });

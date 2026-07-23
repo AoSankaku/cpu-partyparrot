@@ -18,7 +18,6 @@ import {
 interface ContextState {
     action: KeyAction;
     animationSetIndex: number;
-    frameIndex: number;
     lastImage?: string;
     lastTitle?: string;
 }
@@ -30,6 +29,7 @@ export class CpuUsage extends SingletonAction {
     private animationTimer?: NodeJS.Timeout;
     private cpuHistory?: CpuSnapshot;
     private currentCpuPercentage = 0;
+    private animationFrameIndex = 0;
     private loopGeneration = 0;
 
     private readonly animationSets: readonly (readonly string[])[] = [
@@ -51,8 +51,7 @@ export class CpuUsage extends SingletonAction {
         const wasEmpty = this.contexts.size === 0;
         this.contexts.set(ev.action.id, {
             action: ev.action,
-            animationSetIndex: 0,
-            frameIndex: 0
+            animationSetIndex: 0
         });
 
         if (wasEmpty) {
@@ -74,7 +73,6 @@ export class CpuUsage extends SingletonAction {
         }
 
         state.animationSetIndex = (state.animationSetIndex + 1) % this.animationSets.length;
-        state.frameIndex %= this.animationSets[state.animationSetIndex].length;
         state.lastImage = undefined;
     }
 
@@ -103,6 +101,7 @@ export class CpuUsage extends SingletonAction {
 
         this.cpuHistory = undefined;
         this.currentCpuPercentage = 0;
+        this.animationFrameIndex = 0;
     }
 
     private isLoopActive(generation: number): boolean {
@@ -146,14 +145,15 @@ export class CpuUsage extends SingletonAction {
         const updates: Promise<void>[] = [];
         for (const state of this.contexts.values()) {
             const frames = this.animationSets[state.animationSetIndex];
-            const image = frames[state.frameIndex];
-            state.frameIndex = (state.frameIndex + 1) % frames.length;
+            const image = frames[this.animationFrameIndex % frames.length];
 
             if (state.lastImage !== image) {
                 state.lastImage = image;
                 updates.push(state.action.setImage(image));
             }
         }
+        this.animationFrameIndex =
+            (this.animationFrameIndex + 1) % this.animationSets[0].length;
         await Promise.allSettled(updates);
 
         if (this.isLoopActive(generation)) {
