@@ -9,10 +9,16 @@
   previous release. Include an English `## Changes` section describing the
   changes and an English `## Verification` section listing the completed
   checks.
+- GitHub Actions must be the sole creator of GitHub Releases so the release
+  author is consistently `github-actions[bot]`. Never pre-create a release
+  manually or with `gh release create`.
+- Publish releases in this order: push the version tag, wait for the
+  tag-triggered publishing workflow to create the release and upload the
+  `.streamDeckPlugin`, then use `gh release edit` to apply the prepared release
+  notes.
 - Add those release notes to the GitHub Release body. Do not consider a release
   complete until both the release body and the `.streamDeckPlugin` attachment
-  have been verified. If the publishing workflow creates an empty body, update
-  the existing release after publication.
+  have been verified.
 - Obtain explicit user authorization before pushing a release tag, creating or
   editing a GitHub Release, or sending plugin contents to Elgato's validation
   service.
